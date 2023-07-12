@@ -38,32 +38,24 @@ namespace meta {
 
     /* Declarations */
 
-
-    template<std::size_t N>
-    struct string_literal_helper {
-        char _[N] {};
-        consteval string_literal_helper(const char(&str)[N]) { std::copy_n(str, N, _); }
-    };
-
     template <std::size_t N>
-    class string {
+    struct string {
 
         /* Members */
-    private:
-        char _data[N + 1] {};
+        char data[N + 1] {};
 
         /* Constructors */
     public:
         consteval string(const std::string_view &sv) : string(sv.begin(), sv.end()) { }
         consteval string(const char(&str)[N + 1]) : string(str, str + N) { }
-        consteval string(auto... chars) requires (sizeof...(chars) == N) && (std::is_same_v<decltype(chars), char> && ...) : _data { chars... } { }
+        consteval string(auto... chars) requires (sizeof...(chars) == N) && (std::is_same_v<decltype(chars), char> && ...) : data { chars... } { }
 
     private:
 
         // this constructor is for concatenation
-        consteval string(auto... str) requires (sizeof...(str) > 1) && ((str.size() + ...) == N) { auto pos = _data; ((pos = std::copy_n(str.data(), str.size(), pos)), ...); }
+        consteval string(auto... str) requires (sizeof...(str) > 1) && ((str.size() + ...) == N) { auto pos = data; ((pos = std::copy_n(str.data, str.size(), pos)), ...); }
         consteval string(auto... sv) requires (sizeof...(sv) > 1) && (std::is_same_v<decltype(sv), std::string_view> && ...) 
-         { auto pos = _data; ((pos = std::copy(sv.begin(), sv.end(), pos)), ...); }
+         { auto pos = data; ((pos = std::copy(sv.begin(), sv.end(), pos)), ...); }
 
 
         template<class InputIt>
@@ -71,18 +63,17 @@ namespace meta {
             requires (std::is_same_v<std::decay_t<decltype(*std::declval<InputIt>())>, char>) {
             if (N != std::distance(first, last))
                 throw std::length_error("string: length mismatch");
-            std::copy(first, last, _data);
+            std::copy(first, last, data);
         }
 
 
         /* Accessors */
     public:
-        constexpr auto data() const { return _data; }
         consteval auto size() const { return N; }
-        consteval auto at(std::size_t i) requires (i < N) { return _data[i]; }
-        consteval auto operator[](std::size_t i) const { return _data[i]; }
-        constexpr auto begin() const { return data(); }
-        constexpr auto end() const { return data() + N; }
+        consteval auto at(std::size_t i) requires (i < N) { return data[i]; }
+        consteval auto operator[](std::size_t i) const { return data[i]; }
+        constexpr auto begin() const { return data; }
+        constexpr auto end() const { return data + N; }
         constexpr auto rbegin() const { return std::make_reverse_iterator(end()); }
         constexpr auto rend() const { return std::make_reverse_iterator(begin()); }
         consteval auto front() const { return *begin(); }
@@ -92,9 +83,9 @@ namespace meta {
     public:
         // consteval auto insert(std::size_t pos, char c) {
         //     return string<N + 1> {
-        //         std::string_view { _data, pos },
+        //         std::string_view { data, pos },
         //         c,
-        //         std::string_view { _data + pos, N - pos }
+        //         std::string_view { data + pos, N - pos }
         //     };
         // }
         // consteval auto insert(std::size_t pos, auto s) requires (std::is_constructible_v<string, decltype(s)> && std::is_same_v<decltype(s), string<s.size()>>) {
@@ -143,7 +134,7 @@ namespace meta {
         template <std::size_t M> friend consteval auto operator+(const char(&lhs)[M], const string<N> &rhs) { return rhs + lhs; }
 
 
-        // constexpr auto to_string_view() const { return std::string_view { _data }; }
+        // constexpr auto to_string_view() const { return std::string_view { data }; }
 
         /* Conversion operators */
     public:
@@ -151,14 +142,14 @@ namespace meta {
 
         /* Friends */
         template<std::size_t M> friend class string;
-        friend std::ostream &operator<<(std::ostream &os, const string &s) { return os << s._data; }
+        friend std::ostream &operator<<(std::ostream &os, const string &s) { return os << s.data; }
 
     };
 
 
     namespace literals {
-        template <string_literal_helper s>
-        consteval auto operator""_ss() { return string { s._ }; }
+        template <string s>
+        consteval auto operator""_ss() { return s; }
         consteval auto operator""_ss(char c) { return string { c }; }
     }
 
