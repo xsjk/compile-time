@@ -1,4 +1,5 @@
 #include <iostream>
+#include <array>
 
 #include "compile_time_arithmetic.hpp"
 #include "compile_time_typename.hpp"
@@ -6,23 +7,16 @@
 int main() {
     using namespace meta::literals;
 
-    // constexpr auto compileTimeInt = 42i;
-    // std::cout << compileTimeInt << std::endl;  // 输出 42
+    std::cout << 3.14_f << std::endl;
 
-    constexpr auto myInt = 42_v;
-    std::cout << myInt << std::endl;  // 输出 42
-
-
-
-    // std::cout << meta::add<meta::type<int, 1>, meta::type<int, 2>>::value << std::endl;
-    constexpr auto res = (meta::var<1>{} < meta::var<2.0>{});
-
-    std::cout << static_typename(res) << std::endl;
-    std::cout << res << std::endl;
-
-
+    constexpr auto res = (1_i < 2_d) && !(3_f > 4_ld);
+    std::cout << static_typename(res) << "::value = " << res << std::endl; 
     
+    constexpr auto res2 = meta::var<std::array{1, 2, 3, 4, 5}>{}[2_ull];
+    std::cout << static_typename(res2) << "::value = " << res2 << std::endl;
 
+    constexpr auto res3 = meta::var<[](auto x, auto y) { return x + y; }>{};
+    std::cout << static_typename(res3) << "::value = " << res3(2_ld, 3_f) << std::endl;    
 
     return 0;
 }
