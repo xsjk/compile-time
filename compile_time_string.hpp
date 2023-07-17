@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <cstddef>
 #include <algorithm>
 #include <functional>
@@ -7,24 +8,34 @@
 #include <string>
 #include <stdexcept>
 
-#include "compile_time_string.hpp"
+#include "compile_time_arithmetic.hpp"
 
 namespace meta {
 
+
+    constexpr auto min(auto a, auto b) { return a < b ? a : b; }
+    constexpr auto isalpha(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+    constexpr auto isupper(char c) { return c >= 'A' && c <= 'Z'; }
+    constexpr auto islower(char c) { return c >= 'a' && c <= 'z'; }
+    constexpr auto isdigit(char c) { return c >= '0' && c <= '9'; }
+    constexpr auto isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }
+    constexpr auto isalnum(char c) { return isalpha(c) || isdigit(c); }
+    constexpr auto tolower(char c) { return isupper(c) ? c - 'A' + 'a' : c; }
+    constexpr auto toupper(char c) { return islower(c) ? c - 'a' + 'A' : c; }
+    
     /* Forward declarations */
 
     template <std::size_t N> class string;
 
-    /* Helper functions */
-    static consteval std::size_t length(char) { return 1; }
-    template<std::size_t N>
-    static consteval std::size_t length(const char(&)[N]) { return N - 1; }
-    static consteval std::size_t length(std::string_view sv) { return sv.size(); }
-    template<std::size_t N>
-    static consteval std::size_t length(const string<N> &) { return N; }
-    static consteval std::size_t length(auto... t) requires (sizeof...(t) > 1) { return (length(t) + ...); }
+    // /* Helper functions */
+    // static consteval std::size_t length(char) { return 1; }
+    // template<std::size_t N>
+    // static consteval std::size_t length(const char(&)[N]) { return N - 1; }
+    // static consteval std::size_t length(std::string_view sv) { return sv.size(); }
+    // template<std::size_t N>
+    // static consteval std::size_t length(const string<N> &) { return N; }
+    // static consteval std::size_t length(auto... t) requires (sizeof...(t) > 1) { return (length(t) + ...); }
 
-    constexpr auto min(auto a, auto b) { return a < b ? a : b; }
 
     /* Deduction guides */
 
@@ -41,31 +52,18 @@ namespace meta {
     template <std::size_t N>
     struct string {
 
+        constexpr static auto npos = size_t(-1);
+
         /* Members */
         char data[N + 1] {};
 
         /* Constructors */
     public:
-        consteval string(const std::string_view &sv) : string(sv.begin(), sv.end()) { }
-        consteval string(const char(&str)[N + 1]) : string(str, str + N) { }
         consteval string(auto... chars) requires (sizeof...(chars) == N) && (std::is_same_v<decltype(chars), char> && ...) : data { chars... } { }
-
+        template<std::ranges::sized_range R> consteval string(R &&r) { std::ranges::copy(r, data); }
+        consteval string(const char(&s)[N+1]) { std::ranges::copy(s, data); }
     private:
-
-        // this constructor is for concatenation
         consteval string(auto... str) requires (sizeof...(str) > 1) && ((str.size() + ...) == N) { auto pos = data; ((pos = std::copy_n(str.data, str.size(), pos)), ...); }
-        consteval string(auto... sv) requires (sizeof...(sv) > 1) && (std::is_same_v<decltype(sv), std::string_view> && ...) 
-         { auto pos = data; ((pos = std::copy(sv.begin(), sv.end(), pos)), ...); }
-
-
-        template<class InputIt>
-        consteval string(InputIt first, InputIt last)
-            requires (std::is_same_v<std::decay_t<decltype(*std::declval<InputIt>())>, char>) {
-            if (N != std::distance(first, last))
-                throw std::length_error("string: length mismatch");
-            std::copy(first, last, data);
-        }
-
 
         /* Accessors */
     public:
@@ -81,48 +79,100 @@ namespace meta {
 
         /* Methods */
     public:
-        // consteval auto insert(std::size_t pos, char c) {
-        //     return string<N + 1> {
-        //         std::string_view { data, pos },
-        //         c,
-        //         std::string_view { data + pos, N - pos }
-        //     };
-        // }
-        // consteval auto insert(std::size_t pos, auto s) requires (std::is_constructible_v<string, decltype(s)> && std::is_same_v<decltype(s), string<s.size()>>) {
-        //     string<N + s.size()> result {
-        //         substr(0, pos),
-        //         s,
-        //         substr(pos, N)
-        //     }
-        // }
 
-        // find
-        consteval auto find(char c, std::size_t pos = 0) const {
-            const auto it = std::find(begin() + pos, end(), c);
-            return it == end() ? -1 : std::distance(begin(), it);
+
+        // slice
+        template<auto start, auto count = N - start> requires (start + count <= N)
+            consteval auto substr(var<start> = {}, var<count> = {}) const {
+            return string<count>{std::ranges::subrange(begin() + start, begin() + start + count)};
         }
+
+
+        // insert
+        template<auto pos, size_t M> requires (pos <= N)
+            consteval auto insert(var<pos>, string<M> s) const {
+            return substr<0, pos>() + s + substr<pos, N - pos>();
+        }
+        template<auto pos, size_t M>
+        consteval auto insert(var<pos>, const char(&s)[M]) const {
+            return insert<pos>({}, string<M - 1>{s});
+        }
+        template<auto pos>
+        consteval auto insert(var<pos>, char c) const {
+            return insert<pos>({}, string<1>{c});
+        }
+
+
+        // replace
+        template<auto pos, auto count, size_t M> requires (pos + count <= N)
+            consteval auto replace(var<pos>, var<count>, string<M> s) const {
+            return substr<0, pos>() + s + substr<pos + count, N - pos - count>();
+        }
+
+        // search 
+        consteval auto find(char c, std::size_t pos = 0) const { return find(string<1>{c}, pos); }
+        consteval auto find(const char *s, std::size_t pos = 0) const { return find(std::string_view { s }, pos); }
         consteval auto find(const auto &s, std::size_t pos = 0) const {
             const auto it = std::search(begin() + pos, end(), s.begin(), s.end());
-            return it == end() ? -1 : std::distance(begin(), it);
+            return it == end() ? npos : std::distance(begin(), it);
         }
-        consteval auto find(const char *s, std::size_t pos = 0) const {
-            return find(std::string_view { s }, pos);
+        consteval auto rfind(char c, std::size_t pos = N - 1) const { return rfind(string<1>{c}, pos); }
+        consteval auto rfind(const char *s, std::size_t pos = N - 1) const { return rfind(std::string_view { s }, pos); }
+        consteval auto rfind(const auto &s, std::size_t pos = N - 1) const {
+            const auto it = std::search(rbegin() + N - pos - 1, rend(), s.rbegin(), s.rend());
+            return it == rend() ? npos : std::distance(it, rend()) - s.size();
+        }
+        consteval auto find_first_of(const char *s, std::size_t pos = 0) const { return find_first_of(std::string_view { s }, pos); }
+        consteval auto find_first_of(const auto &s, std::size_t pos = 0) const {
+            const auto it = std::find_first_of(begin() + pos, end(), s.begin(), s.end());
+            return it == end() ? npos : std::distance(begin(), it);
+        }
+        consteval auto find_first_not_of(const char *s, std::size_t pos = 0) const { return find_first_not_of(std::string_view { s }, pos); }
+        consteval auto find_first_not_of(const auto &s, std::size_t pos = 0) const {
+            const auto it = std::find_if_not(begin() + pos, end(), [&s](char c) { return std::ranges::find(s, c) != s.end(); });
+            return it == end() ? npos : std::distance(begin(), it);
+        }
+        consteval auto find_last_of(const char *s, std::size_t pos = N - 1) const { return find_last_of(std::string_view { s }, pos); }
+        consteval auto find_last_of(const auto &s, std::size_t pos = N - 1) const {
+            const auto it = std::find_first_of(rbegin() + N - pos - 1, rend(), s.begin(), s.end());
+            return it == rend() ? npos : std::distance(it, rend()) - 1;
+        }
+        consteval auto find_last_not_of(const char *s, std::size_t pos = N - 1) const { return find_last_not_of(std::string_view { s }, pos); }
+        consteval auto find_last_not_of(const auto &s, std::size_t pos = N - 1) const {
+            const auto it = std::find_if_not(rbegin() + N - pos - 1, rend(), [&s](char c) { return std::ranges::find(s, c) != s.end(); });
+            return it == rend() ? npos : std::distance(it, rend()) - 1;
         }
 
-        // substr
-        template<size_t start, size_t count = N - start>
-        consteval auto substr() const {
-            static_assert(start < N, "start must be less than N");
-            static_assert(start + count <= N, "start + count must be less than or equal to N");
-            return string<count>{begin() + start, begin() + start + count};
-        }
+        consteval auto starts_with(const auto &s) const { return std::equal(s.begin(), s.end(), begin()); }
+        consteval auto starts_with(const char *s) const { return starts_with(std::string_view { s }); }
 
-        // consteval auto substr(size_t start, size_t count = M) const {
-        //     return string<M>{begin() + start, begin() + start + count};
+        consteval auto ends_with(const auto &s) const { return std::equal(s.rbegin(), s.rend(), rbegin()); }
+        consteval auto ends_with(const char *s) const { return ends_with(std::string_view { s }); }
+
+        consteval auto contains(const auto &s) const { return find(s) != npos; }
+        consteval auto contains(const char *s) const { return contains(std::string_view { s }); }
+
+        // consteval auto lower() const { 
+        //     // the following code is not constexpr
+        //     // return string<N>{std::ranges::transform_view{ *this, tolower }};
+        //     for (std::size_t i = 0; i < N; ++i) {
+        //         if (isupper(data[i])) {
+        //             return 
+        //         }
+        //     }
+            
         // }
 
 
-    /* Operators */
+
+
+
+
+
+
+
+
+        /* Operators */
     public:
 
         template <std::size_t M> consteval auto operator==(const string<M> &rhs) const { return std::equal(begin(), end(), rhs.begin(), rhs.end()); }
@@ -149,9 +199,24 @@ namespace meta {
 
     namespace literals {
         template <string s>
-        consteval auto operator""_ss() { return s; }
-        consteval auto operator""_ss(char c) { return string { c }; }
+        consteval auto operator""_s() { return s; }
+        consteval auto operator""_s(char c) { return string { c }; }
     }
+
+    template <std::size_t N>
+    struct string_literal {
+        char data[N] {};
+        constexpr string_literal(const char (&s) [N]) { std::ranges::copy(s, data); }
+        friend std::ostream &operator<<(std::ostream &os, const string_literal &s) { return os << s.data; }
+    };
+
+    template<size_t N, string_literal<N> S>
+    struct var<S> {
+        void print() {
+            std::cout << "Specialization for class1" << std::endl;
+        }
+    };
+
 
 
 
