@@ -1,10 +1,23 @@
 #pragma once
-#include <string_view>
-template <typename T>
-constexpr auto _static_typename() {
-    constexpr std::string_view pretty_function = __PRETTY_FUNCTION__;
-    constexpr auto begin = pretty_function.find_first_not_of(' ', pretty_function.find_first_of('=') + 1);
-    constexpr auto end = pretty_function.find_last_not_of(' ', pretty_function.find_last_of(']'));
-    return pretty_function.substr(begin, end - begin);
+
+#include "compile_time_string.hpp"
+
+namespace meta {
+    template <typename T>
+    consteval auto type(T) {
+        using namespace literals;
+        #if defined(__clang__) || defined(__GNUC__)
+            constexpr auto prefix = "T = "_s;
+            constexpr auto suffix = "]"_s;
+            constexpr var<string(__PRETTY_FUNCTION__)> function;
+        #elif defined(__MSC_VER)
+            constexpr auto prefix = "get_type_name<"_s;
+            constexpr auto suffix = ">(void)"_s;
+            constexpr var<string(__FUNCSIG__)> function;
+        #else
+            #error Unsupported compiler
+        #endif
+        constexpr auto start = function.find(prefix) + prefix.size();
+        return function.substr(start, function.find_last_of(suffix) - start);
+    }
 }
-#define static_typename(T) _static_typename<decltype(T)>()

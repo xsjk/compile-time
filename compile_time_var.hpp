@@ -40,7 +40,7 @@ namespace meta {
             return var<(V(I...))>{};
         }
 
-        friend std::ostream &operator<<(std::ostream &os, const var &v) { return os << v.value; }
+        friend std::ostream &operator<<(std::ostream &os, const var<V> &v) { return os << V; }
     };
 
     #define VAR_LITERAL(T, L) \

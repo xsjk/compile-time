@@ -8,7 +8,7 @@
 #include <string>
 #include <stdexcept>
 
-#include "compile_time_arithmetic.hpp"
+#include "compile_time_var.hpp"
 
 namespace meta {
 
@@ -82,18 +82,22 @@ namespace meta {
 
 
         // slice
-        template<auto start, auto count = N - start> requires (start + count <= N)
-            consteval auto substr(var<start> = {}, var<count> = {}) const {
-            return string<count>{std::ranges::subrange(begin() + start, begin() + start + count)};
+        template<auto start, auto count = N - start>
+        consteval auto substr(var<start> = {}, var<count> = {}) const {
+            if constexpr (start >= N)
+                return string<0>{};
+            else
+                return string<count>{std::ranges::subrange(begin() + start, begin() + start + count)};
         }
 
 
         // insert
-        template<auto pos, size_t M> requires (pos <= N)
-            consteval auto insert(var<pos>, string<M> s) const {
+        template<auto pos, std::size_t M>
+        consteval auto insert(var<pos>, string<M> s) const {
+            static_assert(pos <= N);
             return substr<0, pos>() + s + substr<pos, N - pos>();
         }
-        template<auto pos, size_t M>
+        template<auto pos, std::size_t M>
         consteval auto insert(var<pos>, const char(&s)[M]) const {
             return insert<pos>({}, string<M - 1>{s});
         }
@@ -102,12 +106,7 @@ namespace meta {
             return insert<pos>({}, string<1>{c});
         }
 
-
-        // replace
-        template<auto pos, auto count, size_t M> requires (pos + count <= N)
-            consteval auto replace(var<pos>, var<count>, string<M> s) const {
-            return substr<0, pos>() + s + substr<pos + count, N - pos - count>();
-        }
+    public:
 
         // search 
         consteval auto find(char c, std::size_t pos = 0) const { return find(string<1>{c}, pos); }
@@ -160,16 +159,7 @@ namespace meta {
         //             return 
         //         }
         //     }
-            
         // }
-
-
-
-
-
-
-
-
 
 
         /* Operators */
@@ -182,6 +172,13 @@ namespace meta {
         template <std::size_t M> consteval auto operator+(const char(&rhs)[M]) const { return *this + string<M - 1>{rhs}; }
         friend consteval auto operator+(char lhs, const string<N> &rhs) { return rhs + lhs; }
         template <std::size_t M> friend consteval auto operator+(const char(&lhs)[M], const string<N> &rhs) { return rhs + lhs; }
+
+        template <auto K> consteval auto operator*(var<K>) const requires (K == 0) { return string<0>{}; }
+        template <auto K> consteval auto operator*(var<K> k) const requires (K != 0) {
+            static_assert(K > 0, "K must be greater than 0");
+            return string<N * K>{*this, operator*(k - 1_i)}; 
+        }
+        template <auto K> friend consteval auto operator*(var<K> k, const string<N> &rhs) { return rhs * k; }
 
 
         // constexpr auto to_string_view() const { return std::string_view { data }; }
@@ -196,72 +193,146 @@ namespace meta {
 
     };
 
-
     namespace literals {
         template <string s>
-        consteval auto operator""_s() { return s; }
-        consteval auto operator""_s(char c) { return string { c }; }
+        consteval auto operator""_s() { return var<s>{}; }
+        // consteval auto operator""_s(char c) { return var<string<1>{c}>{}; }
     }
 
-    template <std::size_t N>
-    struct string_literal {
-        char data[N] {};
-        constexpr string_literal(const char (&s) [N]) { std::ranges::copy(s, data); }
-        friend std::ostream &operator<<(std::ostream &os, const string_literal &s) { return os << s.data; }
-    };
 
-    template<size_t N, string_literal<N> S>
+    template<std::size_t N, string<N> S>
     struct var<S> {
-        void print() {
-            std::cout << "Specialization for class1" << std::endl;
+        using value_type = decltype(S);
+        static constexpr var<S.npos> npos = {};
+        static constexpr auto value = S;
+
+        /* Accessors */
+
+        static consteval auto size() { return var<N>{}; }
+
+        template<auto I> 
+        consteval auto operator[](var<I>) const { return var<(S[I])>{}; }
+
+        template<auto I>
+        static consteval auto at(var<I>) { 
+            static_assert(I < N, "out of range");
+            return operator[](var<I>{});
         }
+
+        /* Iterators */
+
+        static consteval auto data() { return var<value.data>{}; }
+        #define ITER_ACCESSOR(name) \
+            static consteval auto name() { return S.name(); }
+            ITER_ACCESSOR(begin) 
+            ITER_ACCESSOR(end) 
+            ITER_ACCESSOR(rbegin) 
+            ITER_ACCESSOR(rend) 
+            ITER_ACCESSOR(front) 
+            ITER_ACCESSOR(back)
+        #undef ITER_ACCESSOR
+
+        /* Methods */
+
+        // compare
+        template<auto str>
+        static consteval auto compare(var<str>) {
+            if constexpr (S == str)
+                return 0_i;
+            else if constexpr (S < str)
+                return -1_i;
+            else if constexpr (S > str)
+                return 1_i;
+        }
+
+        // slice
+        template<auto start, auto count = N - start> 
+        static consteval auto substr(var<start> i, var<count> c = {}) {
+            return var<S.substr(i, c)>{};
+        }
+
+        // insert
+        template<auto pos, auto str>
+        static consteval auto insert(var<pos> i, var<str>) {
+            return var<S.insert(i, str)>{};
+        }
+
+        // replace
+        template<auto str1, auto str2>
+        static consteval auto replace(var<str1> s1, var<str2> s2) {
+            constexpr auto pos = find(s1);
+            if constexpr(pos != npos)
+                return substr(0_i, pos) + s2 + substr(pos + 1_i).replace(s1, s2);
+            else
+                return copy();
+        }
+
+        // search 
+        #define SEARCHER(name, from) \
+            template <auto str, auto pos = from> \
+            static consteval auto name(var<str>, var<pos> = {}) { \
+                return var<S.name(str, pos)>{}; \
+            }
+            SEARCHER(find, 0)
+            SEARCHER(rfind, N - 1)
+            SEARCHER(find_first_of, 0)
+            SEARCHER(find_first_not_of, 0)
+            SEARCHER(find_last_of, N - 1)
+            SEARCHER(find_last_not_of, N - 1)
+        #undef SEARCHER
+
+        // check
+        #define CHECKER(name) \
+            template <auto str> \
+            static consteval auto name(var<str>) { \
+                return var<S.name(str)>{}; \
+            }
+            CHECKER(starts_with)
+            CHECKER(ends_with)
+            CHECKER(contains)
+        #undef CHECKER
+        
+        // strip
+        static consteval auto lstrip() {
+            using namespace literals;
+            constexpr auto pos = find_first_not_of(" \t\n\v\f\r"_s);
+            if constexpr(pos != npos)
+                return substr(pos);
+            else
+                return copy();
+        }
+
+        static consteval auto rstrip() {
+            using namespace literals;
+            constexpr auto pos = find_last_not_of(" \t\n\v\f\r"_s);
+            if constexpr(pos != npos)
+                return substr(0_i, pos + 1_i);
+            else
+                return copy();
+        }
+
+        static consteval auto strip() {
+            return lstrip().rstrip();
+        }
+
+        // copy
+        static consteval auto copy() { return var<S>{}; }
+
+        /* Operators */
+        #define BIN_OP(op) \
+            template <auto S2> \
+            consteval var<(S op S2)> operator op(var<S2>) const { return {}; }
+            BIN_OP(+) BIN_OP(==) BIN_OP(!=) BIN_OP(<) BIN_OP(>) BIN_OP(<=) BIN_OP(>=) 
+        #undef BIN_OP
+        
+        template <auto K> 
+        consteval auto operator*(var<K> k) const { return var<S * k>{}; }
+        template <auto K> 
+        friend consteval auto operator*(var<K> k, var<S> s) { return s * k; }
+
+        friend std::ostream &operator<<(std::ostream &os, const var<S> &s) { return os << S; }
     };
 
-
-
-
-
-
-    // template <char... C>
-    // struct static_string {
-    //     static constexpr char value[sizeof...(C) + 1] = {C..., '\0'};
-
-    //     template<char ... Pattern>
-    //     static consteval int _find() {
-    //         constexpr auto pattern = static_string<Pattern...>::value;
-    //         auto it = std::search(value, value + sizeof...(C), pattern, pattern + sizeof...(Pattern));
-    //         return it == value + sizeof...(C) ? -1 : std::distance(value, it);
-    //     }
-    //     template<char ... Pattern> static constexpr auto find = _find<Pattern...>();
-
-    //     template <std::size_t I>
-    //     static consteval char at() { return value[I]; }
-
-    //     static consteval std::size_t size() { return sizeof...(C); }
-
-    //     template <std::size_t Start, std::size_t Count = sizeof...(C) - Start>
-    //     static consteval auto _substr() {
-    //         static_assert(Start < sizeof...(C), "Start must be less than sizeof...(C)");
-    //         static_assert(Start + Count <= sizeof...(C), "Start + Count must be less than or equal to sizeof...(C)");
-    //         return static_string<value[Start + I]...>{};
-    //     }
-    //     template <std::size_t Start, std::size_t Count = sizeof...(C) - Start>
-    //     using substr = decltype(_substr<Start, Count>());
-
-
-    //     template <char... D>
-    //     static consteval auto operator+(static_string<D...>) {
-    //         return static_string<C..., D...>{};
-    //     }
-
-
-
-    // };
-
-    // template <char... C>
-    // std::ostream &operator<<(std::ostream &os, const static_string<C...> &) { 
-    //     return os << static_string<C...>::value; 
-    // }
 
 }
 

@@ -17,25 +17,26 @@ int main() {
     using namespace meta::literals;
     using namespace std::string_literals;
 
-    constexpr auto s1 = ("Hello"_s + "World");
-    constexpr auto s2 = meta::string('H', 'e', 'l', 'l', 'o') + " World";
-    constexpr auto s3 = meta::string<5>("Hello"sv);
-    constexpr auto s4 = s1.find("World");
-    constexpr auto s5 = "Hello"_s.substr<1, 3>();
-    constexpr auto s6 = "Hello"_s.substr(1_i, 3_i);
-    constexpr auto s7 = "Hello"_s.insert(1_i, "1");
-    constexpr auto s8 = s1.substr<s1.find_last_not_of("l")>();
+    constexpr auto s9 = "Hello"_s;
+    constexpr auto s10 = "World"_s;
 
 
     std::cout << std::boolalpha;
-    std::cout << s1 << std::endl;
-    std::cout << s2 << std::endl;
-    std::cout << s3 << std::endl;
-    std::cout << s4 << std::endl;
-    std::cout << s5 << std::endl;
-    std::cout << s6 << std::endl;
-    std::cout << s7 << std::endl;
-    std::cout << s8 << std::endl;
+    std::cout << s9.size() << s9 << std::endl;
+    std::cout << s9[0_i] << std::endl;
+    std::cout << s9.substr(1_i, 3_i) << std::endl;
+    std::cout << s9 + s10 << std::endl;
+    std::cout << 2_i * s9  << std::endl;
+    std::cout << s9.compare(s10) << std::endl;
+    std::cout << (s9 < s10) << std::endl;
+    std::cout << s9.find_first_not_of("ll"_s) << std::endl;
+    std::cout << s9.replace("l"_s, "L"_s) << std::endl;
+    std::cout << (" "_s + s9 + " "_s).rstrip() + "|"_s << std::endl;
+
+    constexpr auto d = s9.data();
+
+    std::cout << type(d) << ' ' << d << std::endl;
+    
 
 
     // constexpr auto l1 = meta::length('a');
@@ -45,15 +46,14 @@ int main() {
     // constexpr auto l5 = meta::length('a', "Hello", "Hello"sv, "Hello"_s);
     // std::cout << l1 << ' ' << l2 << ' ' << l3 << ' ' << l4 << ' ' << l5 << std::endl;
 
+    for  (auto c: s9)
+        std::cout << c << ' ';
+    std::cout << std::endl;
 
+    for  (auto c: std::ranges::reverse_view(s9))
+        std::cout << c << ' ';
+    std::cout << std::endl;
 
-    // using MyString = meta::static_string<'H', 'e', 'l', 'l', 'o'>;
-    // std::cout << MyString::find<'l', 'o'> << std::endl;  // 输出: true
-
-    // using SubstringType = MyString::substr<1, 3>;
-    // std::cout << SubstringType{} << std::endl;  // 输出: ell
-
-    // return 0;
 
     return 0;
 
