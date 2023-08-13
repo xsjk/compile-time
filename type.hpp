@@ -1,10 +1,10 @@
 #pragma once
 
-#include "compile_time_string.hpp"
+#include "string.hpp"
 
 namespace meta {
     template <typename T>
-    consteval auto type(T) {
+    constexpr auto type(T) {
         using namespace literals;
         #if defined(__clang__) || defined(__GNUC__)
             constexpr auto prefix = "T = "_s;

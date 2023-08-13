@@ -4,7 +4,8 @@
 
 namespace meta {
 
-    template <auto V> struct var { 
+    template <auto V>
+    struct var {
         using value_type = decltype(V);
         static constexpr value_type value = V;
         consteval operator value_type () const { return V; }
@@ -42,6 +43,14 @@ namespace meta {
 
         friend std::ostream &operator<<(std::ostream &os, const var<V> &v) { return os << V; }
     };
+
+    template <typename T>
+    consteval auto eval(T t) {
+        if constexpr (requires { T::value; })
+            return eval(T::value);
+        else
+            return t;
+    }
 
     #define VAR_LITERAL(T, L) \
         template <char... C> \

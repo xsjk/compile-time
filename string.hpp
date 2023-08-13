@@ -8,7 +8,7 @@
 #include <string>
 #include <stdexcept>
 
-#include "compile_time_var.hpp"
+#include "var.hpp"
 
 namespace meta {
 
@@ -59,6 +59,7 @@ namespace meta {
 
         /* Constructors */
     public:
+
         consteval string(auto... chars) requires (sizeof...(chars) == N) && (std::is_same_v<decltype(chars), char> && ...) : data { chars... } { }
         template<std::ranges::sized_range R> consteval string(R &&r) { std::ranges::copy(r, data); }
         consteval string(const char(&s)[N+1]) { std::ranges::copy(s, data); }
@@ -196,7 +197,6 @@ namespace meta {
     namespace literals {
         template <string s>
         consteval auto operator""_s() { return var<s>{}; }
-        // consteval auto operator""_s(char c) { return var<string<1>{c}>{}; }
     }
 
 
@@ -332,7 +332,6 @@ namespace meta {
 
         friend std::ostream &operator<<(std::ostream &os, const var<S> &s) { return os << S; }
     };
-
 
 }
 
