@@ -264,7 +264,7 @@ namespace meta {
             if constexpr(pos != npos)
                 return substr(0_i, pos) + s2 + substr(pos + 1_i).replace(s1, s2);
             else
-                return copy();
+                return self();
         }
 
         // search 
@@ -299,7 +299,7 @@ namespace meta {
             if constexpr(pos != npos)
                 return substr(pos);
             else
-                return copy();
+                return self();
         }
 
         static consteval auto rstrip() {
@@ -308,15 +308,15 @@ namespace meta {
             if constexpr(pos != npos)
                 return substr(0_i, pos + 1_i);
             else
-                return copy();
+                return self();
         }
 
         static consteval auto strip() {
             return lstrip().rstrip();
         }
 
-        // copy
-        static consteval auto copy() { return var<S>{}; }
+        // self
+        static consteval auto self() { return var<S>{}; }
 
         /* Operators */
         #define BIN_OP(op) \

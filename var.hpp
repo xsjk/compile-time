@@ -1,10 +1,11 @@
 #pragma once
 
 #include <iostream>
+#include <optional>
 
 namespace meta {
 
-    template <auto V>
+    template <auto V=std::nullopt>
     struct var {
         using value_type = decltype(V);
         static constexpr value_type value = V;
@@ -32,24 +33,49 @@ namespace meta {
         // operator []
         template <auto I>
         consteval auto operator[](var<I>) const {
-            return var<(V[I])>{};
+            if constexpr (std::is_void_v<decltype(V[I])>)
+                return var<>{};
+            else
+                return var<V[I]>{};
         }
 
         // operator ()
         template <auto... I>
         consteval auto operator()(var<I>...) const {
-            return var<(V(I...))>{};
+            if constexpr (std::is_void_v<decltype(V(I...))>)
+                return var<>{};
+            else
+                return var<V(I...)>{};
         }
 
-        friend std::ostream &operator<<(std::ostream &os, const var<V> &v) { return os << V; }
+        friend std::ostream &operator<<(std::ostream &os, const var<V> &v) { 
+            if constexpr (std::is_same_v<std::decay_t<decltype(V)>, std::nullopt_t>)
+                return os << "None";
+            else
+                return os << V; 
+        }
     };
+
+    template <auto V>
+    consteval auto is_var(var<V>) { return true; }
+
+    template <typename T>
+    consteval auto is_var(T) { return false; }
+
+    // template <auto V>
+    // concept Var = is_var(var<V>{});
+
 
     template <typename T>
     consteval auto eval(T t) {
-        if constexpr (requires { T::value; })
-            return eval(T::value);
-        else
+        if constexpr (requires { T::value; }) {
+            if constexpr (is_var(T{}))
+                return eval(T::value);
+            else 
+                return t;
+        } else {
             return t;
+        }
     }
 
     #define VAR_LITERAL(T, L) \
@@ -75,4 +101,6 @@ namespace meta {
         VAR_LITERAL(long double, ld)
     #undef VAR_LITERAL
 
+
+    constexpr auto None = var<>{};
 }
