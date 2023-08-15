@@ -103,4 +103,8 @@ namespace meta {
 
 
     constexpr auto None = var<>{};
+
+    // template <auto T>
+    // requires (is_var(T))
+    // struct var<T> : decltype(T) {};
 }

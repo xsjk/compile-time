@@ -1,7 +1,7 @@
 #pragma once
 
 #include "var.hpp"
-#include "len.hpp"
+#include "utils.hpp"
 #include <tuple>
 #include <type_traits>
 
@@ -9,6 +9,13 @@ namespace meta {
 
     template <auto ...V>
     struct tuple;
+
+
+    template <typename T>
+    consteval auto is_tuple(T) { return false; }
+
+    template <auto ...V>
+    consteval auto is_tuple(tuple<V...>) { return true; }
 
 
     template <auto ...V>
@@ -30,6 +37,9 @@ namespace meta {
         template<auto ...W>
         requires (sizeof...(V) == sizeof...(W)) && (std::is_same_v<var<V>, var<W>> && ...)
         constexpr tuple(var<W>...) {}
+
+        // from any
+        constexpr tuple(auto ...w) : tuple{var<eval(w)>{}...} {}
 
         // from std::integer_sequence
         template<typename T, T ...W>
@@ -58,6 +68,24 @@ namespace meta {
         // back
         static consteval auto back() { return at(len(self()) - 1_i); }
 
+        // self
+        static consteval auto self() { return tuple<V...>{}; }
+
+        // sort 
+        static consteval auto sort() {
+            return sort([](auto a, auto b) { return a < b; });
+        }
+        static consteval auto sort(auto f) {
+            if constexpr (size() <= 1) 
+                return self();
+            else {
+                constexpr auto pivot = back();
+                auto rest = slice(0_i, len(self()) - 1_i);
+                auto left = rest.filter(var<[=](auto v) { return f(v, pivot); }>{}).sort(f);
+                auto right = rest.filter(var<[=](auto v) { return !f(v, pivot); }>{}).sort(f);
+                return left + tuple<pivot.value>{} + right;
+            }
+        }
 
         // for each
         template<typename F, auto ...W>
@@ -86,6 +114,13 @@ namespace meta {
         // sum
         static consteval auto sum() { return reduce([](auto a, auto b) { return a + b; }); }
 
+        // min
+        static consteval auto min() { return reduce([](auto a, auto b) { return a < b ? a : b; }); }
+
+        // max
+        static consteval auto max() { return reduce([](auto a, auto b) { return a > b ? a : b; }); }
+
+
         // accumulate
         template<typename F>
         static consteval auto accumulate(F f) {
@@ -107,7 +142,7 @@ namespace meta {
                 return self();
             else if constexpr (F{}(back())) {
                 auto prev = slice(0_i, len(self()) - 1_i).filter(f);
-                return prev + tuple<back()>{};
+                return prev + tuple<back().value>{};
             } else 
                 return slice(0_i, len(self()) - 1_i).filter(f);
         }
@@ -118,8 +153,9 @@ namespace meta {
             return range(begin, end, diff).map([](auto i) { return at(i); });
         }
 
-        // self
-        static consteval auto self() { return tuple<V...>{}; }
+        // search
+
+
 
         // append
         template<auto W>
@@ -161,10 +197,8 @@ namespace meta {
             return os << "\b\b)";
         }
 
-        template <auto ...W>
-        requires (sizeof...(V) == sizeof...(W)) && (std::is_same_v<var<V>, var<W>> && ...)
-        constexpr auto operator==(tuple<W...>) const { return true; }
-
+        // compare
+        
 
     };
 
@@ -179,5 +213,12 @@ namespace meta {
     template <auto E>
     consteval auto range(var<E> end) { return range(0_i, end); }
 
+
+    template <auto T>
+    requires (is_tuple(T))
+    struct var<T> : decltype(T) {};
+
+    template <auto ...V>
+    consteval auto make_tuple(var<V>...) { return var<tuple<eval(V)...>{}>{}; }
 
 }

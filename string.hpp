@@ -13,7 +13,6 @@
 namespace meta {
 
 
-    constexpr auto min(auto a, auto b) { return a < b ? a : b; }
     constexpr auto isalpha(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
     constexpr auto isupper(char c) { return c >= 'A' && c <= 'Z'; }
     constexpr auto islower(char c) { return c >= 'a' && c <= 'z'; }

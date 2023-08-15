@@ -26,7 +26,7 @@ int main() {
     constexpr auto res3 = meta::var<[](auto x, auto y) { return x + y; }>{};
     std::cout << meta::type(res3) << "::value = " << res3(2_ld, 3_f) << std::endl;    
 
-    constexpr auto res4 = meta::eval(meta::var<meta::var<1>{}>{});
+    constexpr auto res4 = meta::var<meta::var<1>{}>{};
     std::cout << meta::type(res4) << "::value = " << res4 << std::endl;
 
     return 0;
