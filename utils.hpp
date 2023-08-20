@@ -6,7 +6,7 @@ namespace meta {
 
     template<typename T>
     consteval auto len(T) {
-        return var<T{}.size()>{};
+        return var<eval(T{}.size())>{};
     }
 
     constexpr auto min(auto a, auto b) {

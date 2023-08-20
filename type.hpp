@@ -4,7 +4,7 @@
 
 namespace meta {
     template <typename T>
-    constexpr auto type(T) {
+    constexpr auto type(const T&) {
         using namespace literals;
         #if defined(__clang__) || defined(__GNUC__)
             constexpr auto prefix = "T = "_s;

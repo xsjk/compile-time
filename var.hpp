@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include <optional>
 
 namespace meta {
@@ -47,14 +46,15 @@ namespace meta {
             else
                 return var<V(I...)>{};
         }
-
-        friend std::ostream &operator<<(std::ostream &os, const var<V> &v) { 
-            if constexpr (std::is_same_v<std::decay_t<decltype(V)>, std::nullopt_t>)
-                return os << "None";
-            else
-                return os << V; 
-        }
     };
+
+    template<auto V>
+    auto &operator<<(auto &os, const var<V> &v) { 
+        if constexpr (std::is_same_v<std::decay_t<decltype(V)>, std::nullopt_t>)
+            return os << "None";
+        else
+            return os << V; 
+    }
 
     template <auto V>
     consteval auto is_var(var<V>) { return true; }
